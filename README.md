@@ -4,7 +4,7 @@ This document covers every command in `.cursor/commands/` -- what each one does,
 
 # Initial Setup
 
-`git clone [url]`
+`git clone https://github.com/JustinJoshi/cursor-Commands.git`
 
 - Clone this repo into a new directory on your desktop
 - Copy the .cursor file into your project
