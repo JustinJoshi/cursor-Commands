@@ -1,7 +1,3 @@
-# Cursor Commands Guide
-
-This document covers every command in `.cursor/commands/` -- what each one does, how to use it, and the intended workflow that ties them together.
-
 # Initial Setup
 
 `git clone https://github.com/JustinJoshi/cursor-Commands.git`
@@ -9,6 +5,11 @@ This document covers every command in `.cursor/commands/` -- what each one does,
 - Clone this repo into a new directory on your desktop
 - Copy the .cursor file into your project
 - Start auditing!
+
+# Cursor Commands Guide
+
+This document covers every command in `.cursor/commands/` -- what each one does, how to use it, and the intended workflow that ties them together.
+
 
 ## How to invoke a command
 
