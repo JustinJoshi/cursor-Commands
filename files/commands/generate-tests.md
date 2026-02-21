@@ -32,13 +32,25 @@ find convex -type f -name "*.ts" | sort
 ```
 Read the mutations and queries. This tells you what operations actually exist server-side, which confirms what flows are real vs just UI.
 
-### 4. Audit report (if present)
+### 4. Clerk authentication (if present)
+```bash
+cat package.json | grep -i clerk
+```
+If `@clerk/nextjs` or any `@clerk/*` package is present, **do not use manual UI sign-in** anywhere in the test suite. Clerk will trigger an email verification code on unrecognized devices, which cannot be automated via the form.
+
+Instead, use Clerk's official testing package:
+- Install `@clerk/testing` as a dev dependency
+- Use `clerkSetup()` in global setup to obtain a Testing Token
+- Use `clerk.signIn({ page, emailAddress })` to authenticate programmatically via `CLERK_SECRET_KEY` — this bypasses the UI and any 2FA/email verification entirely
+- Never generate `page.getByLabel('Email address').fill(...)` or similar UI-based sign-in sequences for Clerk apps
+
+### 5. Audit report (if present)
 ```bash
 ls -1d audit-reports/AUDIT-*/consolidated/CONSOLIDATED.md | sort | tail -1 || ls audit-reports/ | rg -i consolidated | sort | tail -1
 ```
 Read the most recent audit report. Every finding references a real feature. Use it to ensure tests cover every flow the audit touched — especially security-sensitive ones.
 
-### 5. Existing tests (if any)
+### 6. Existing tests (if any)
 ```bash
 find e2e -name "audit-*.spec.ts" | sort
 find e2e -name "*.spec.ts" ! -name "audit-*.spec.ts" | sort
@@ -141,24 +153,35 @@ export default defineConfig({
 
 ### e2e/global.setup.ts (Clerk auth)
 ```typescript
-import { test as setup, expect } from '@playwright/test'
+import { clerk, clerkSetup } from '@clerk/testing/playwright'
+import { test as setup } from '@playwright/test'
 import path from 'path'
 
 const authFile = path.join(__dirname, '.auth/user.json')
 
+// Obtain a Clerk Testing Token for all subsequent tests
+setup('global setup', async ({}) => {
+  await clerkSetup()
+})
+
 setup('authenticate', async ({ page }) => {
-  // Navigate to sign-in
-  await page.goto('/sign-in')
+  // Navigate to an unprotected page that loads Clerk
+  await page.goto('/')
 
-  // Fill Clerk sign-in form
-  await page.getByLabel('Email address').fill(process.env.TEST_USER_EMAIL!)
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByLabel('Password').fill(process.env.TEST_USER_PASSWORD!)
-  await page.getByRole('button', { name: 'Continue' }).click()
+  // Authenticate via Clerk's testing helper — uses CLERK_SECRET_KEY to bypass
+  // email verification codes that trigger on unrecognized devices
+  await clerk.signIn({
+    page,
+    signInParams: {
+      strategy: 'password',
+      identifier: process.env.TEST_USER_EMAIL!,
+      password: process.env.TEST_USER_PASSWORD!,
+    },
+  })
 
-  // Wait for redirect to dashboard
-  await page.waitForURL('/')
-  await expect(page).toHaveURL('/')
+  // Verify access to a protected route
+  await page.goto('/dashboard')
+  await page.waitForURL('/dashboard')
 
   // Save auth state — reused by all tests
   await page.context().storageState({ path: authFile })
@@ -170,20 +193,27 @@ setup('authenticate', async ({ page }) => {
 TEST_USER_EMAIL=your-test-user@example.com
 TEST_USER_PASSWORD=your-test-password
 PLAYWRIGHT_BASE_URL=http://localhost:3000
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 ```
 
 ### e2e/helpers/auth.ts
 ```typescript
+import { clerk } from '@clerk/testing/playwright'
 import { Page } from '@playwright/test'
 
-// Use this in any test that needs a fresh authenticated state
+// Use this in any test that needs a fresh authenticated state.
+// clerk.signIn uses CLERK_SECRET_KEY to bypass email verification prompts.
 export async function signIn(page: Page) {
-  await page.goto('/sign-in')
-  await page.getByLabel('Email address').fill(process.env.TEST_USER_EMAIL!)
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByLabel('Password').fill(process.env.TEST_USER_PASSWORD!)
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.waitForURL('/')
+  await page.goto('/')
+  await clerk.signIn({
+    page,
+    signInParams: {
+      strategy: 'password',
+      identifier: process.env.TEST_USER_EMAIL!,
+      password: process.env.TEST_USER_PASSWORD!,
+    },
+  })
 }
 ```
 
@@ -302,22 +332,28 @@ SETUP INSTRUCTIONS
    npm install -D @playwright/test
    npx playwright install chromium
 
-2. Create test user in Clerk dashboard:
+2. Install Clerk testing package:
+   npm install -D @clerk/testing
+
+3. Create test user in Clerk dashboard:
    - Go to clerk.com → your app → Users → Create user
    - Use a dedicated test email (not your real account)
    - Add credentials to .env.test
+   - Copy your Publishable Key and Secret Key from clerk.com → your app → API Keys
+   - Add both to .env.test as CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY
+   - Never commit .env.test — ensure it is in .gitignore
 
-3. Create auth directory:
+4. Create auth directory:
    mkdir -p e2e/.auth
    echo "e2e/.auth/" >> .gitignore    # never commit auth tokens
 
-4. Run setup only:
+5. Run setup only:
    npx playwright test --project=setup
 
-5. Run full suite:
+6. Run full suite:
    npx playwright test
 
-6. View results:
+7. View results:
    npx playwright show-report
 ═══════════════════════════════════════════
 ```
