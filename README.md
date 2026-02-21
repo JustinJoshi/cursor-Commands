@@ -7,7 +7,7 @@ This document covers every command in `.cursor/commands/` -- what each one does,
 `git clone https://github.com/JustinJoshi/cursor-Commands.git`
 
 - Clone this repo into a new directory on your desktop
-- Copy the .cursor file into your project
+- Copy the contents of "files" into the .cursor file of your project
 - Start auditing!
 
 ## How to invoke a command
