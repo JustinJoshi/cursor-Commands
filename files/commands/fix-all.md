@@ -25,7 +25,7 @@ Do not implement batch code changes directly in the orchestrator context.
 ## Input expectations
 
 - Run `/fix-plan` first.
-- Source fix batches from user-provided plan text or latest plan/report path.
+- Source fix batches from user-provided plan text, or look for the latest consolidated audit report at `audit-reports/AUDIT-[timestamp]/consolidated/CONSOLIDATED.md` (individual role reports at `audit-reports/AUDIT-[timestamp]/individual/`).
 - If batch list is unavailable, stop and ask for it.
 
 ## Phase 0 - Interactive configuration (AskQuestion)

@@ -9,7 +9,11 @@ You are a tech lead turning an audit report into an efficient execution plan. Yo
 
 ## Input
 
-The user will provide the audit report (or paste findings from it). If not provided, look for the most recent file in `audit-reports/`.
+The user will provide the audit report (or paste findings from it). If not provided, look for the most recent consolidated report at `audit-reports/AUDIT-[timestamp]/consolidated/CONSOLIDATED.md`. Individual role reports are at `audit-reports/AUDIT-[timestamp]/individual/[roleSlug].md`. Use this command to find the latest:
+
+```bash
+ls -1d audit-reports/AUDIT-*/consolidated/CONSOLIDATED.md | sort | tail -1
+```
 
 ---
 
@@ -108,4 +112,4 @@ Use ⚡ Sonnet for: [everything else — list count]
 
 - Output ready-to-paste prompt blocks — the user should be able to copy each batch directly into a new chat
 - Don't execute any fixes — plan only
-- If the audit report is not provided, say: "Please paste your audit report or confirm the path to the most recent file in audit-reports/"
+- If the audit report is not provided, say: "Please paste your audit report, or I'll look for the most recent one at `audit-reports/AUDIT-[timestamp]/consolidated/CONSOLIDATED.md`."
