@@ -30,33 +30,26 @@ Commands listed in workflow order.
 | `/audit-a11y-browser` | 1 -- Audit | Live URL accessibility audit via Playwright + axe-core | Sonnet |
 | `/audit-dry` | 1 -- Audit | DRY/pattern duplication and abstraction audit | Sonnet |
 | `/generate-tests` | 2 -- Test generation | Generates complete Playwright e2e suite and setup | Opus |
-| `/fix-plan` | 3 -- Fix | Batches and sequences audit findings into execution plan | Sonnet/Opus split |
-| `/fix` | 3 -- Fix | Executes one specific audit finding fix | Sonnet (most), Opus (architectural) |
-| `/fix-all` | 3 -- Fix | Runs all fix batches with test gates and rollback | Sonnet (most), Opus (specific PE fixes) |
-| `/fix-rollback` | 3 -- Fix | Reverts problematic fix commits/files/branches | Sonnet |
-| `/debug-tests` | 4 -- Debug | Iterative Playwright failure debugging with resumable sessions | Sonnet/Opus as needed |
+| `/debug-tests` | 3 -- Debug | Iterative Playwright failure debugging with resumable sessions | Sonnet/Opus as needed |
 
 ## Workflow
 
 The commands are designed to work as a pipeline. Each step builds on the output of the previous one.
 
 ```text
-/audit-all → /generate-tests → /fix-plan → /fix-all → /debug-tests
+/audit-all → /generate-tests → /debug-tests
 ```
 
 **Step 1 -- Audit.** Start with `/audit-all` to get a comprehensive picture of what needs attention across architecture, security, operations, accessibility, and code patterns. The consolidated report becomes the input for everything downstream. Use individual audit commands (`/audit-security`, `/audit-devops`, etc.) when you only need one perspective.
 
-**Step 2 -- Generate tests.** Run `/generate-tests` after auditing so that Playwright test gates exist before you start making changes. This gives `/fix-all` a safety net to validate each batch of fixes against, and gives you confidence that fixes don't introduce regressions.
+**Step 2 -- Generate tests.** Run `/generate-tests` after auditing so that Playwright test gates exist before you start making changes. This gives you a baseline to validate against and confidence that changes don't introduce regressions.
 
-**Step 3 -- Plan and execute fixes.** Run `/fix-plan` to turn the audit report into a sequenced execution plan -- batched by file, ordered by severity, with model recommendations per batch. Then run `/fix-all` to execute the plan with automated test gating after every commit. For high-risk or architectural findings you want to review manually, use `/fix` to handle one finding at a time. If anything regresses, run `/fix-rollback` before re-planning.
-
-**Step 4 -- Debug.** After fixes are applied, run `/debug-tests` to iteratively fix any remaining Playwright failures. Each failure gets a fresh worker agent with focused context. The loop continues until all tests pass or stop conditions are reached.
+**Step 3 -- Debug.** After tests are generated, run `/debug-tests` to iteratively fix any failing Playwright tests. Each failure gets a fresh worker agent with focused context. The loop continues until all tests pass or stop conditions are reached.
 
 **Tips:**
 
-- Use `/audit-all` for periodic full-project quality gates, not just before fix runs.
-- Prefer `/fix` over `/fix-all` for principal-engineer-level architectural findings where you want to review each change.
-- Keep `/generate-tests` and `/debug-tests` in your regular loop so fixes remain verifiable.
+- Use `/audit-all` for periodic full-project quality gates, not just before debug runs.
+- Keep `/generate-tests` and `/debug-tests` in your regular loop so changes remain verifiable.
 
 ---
 
@@ -148,61 +141,7 @@ Generates a full Playwright e2e suite for a Next.js app.
 
 ---
 
-### Step 3 -- Fix planning and execution
-
-#### `/fix-plan`
-
-Turns an audit report into a sequenced execution plan.
-
-- **Input:** Pasted audit report or the latest file in `audit-reports/`.
-- **What it produces:**
-  - Batches grouped by file, ordered by severity.
-  - New shared-file prerequisites (created before dependent batches).
-  - Ordered execution list.
-  - Model assignment summary (Sonnet vs Opus per batch).
-- **Behavior:** Planning only -- does not execute any fixes.
-
-#### `/fix`
-
-Executes a single pre-diagnosed finding from an audit report.
-
-- **Required input:** The finding text (ID, issue, fix instruction) and the relevant current code.
-- **Output:** Short fix summary, complete updated file content, change log, and verification checklist.
-- **Model guidance:** Sonnet for mechanical fixes; Opus for architectural `[PRINCIPAL]` work.
-
-#### `/fix-all`
-
-Executes all planned fix batches sequentially using fresh Task workers, with test gating after every commit.
-
-- **Interactive configuration:** Prompts you to select which batches to execute, the worker model strategy, and whether auto-fix mode is enabled on post-commit test failures.
-- **Prerequisites:** Requires a fix plan from `/fix-plan` and a working Playwright suite from `/generate-tests`. Verifies both before starting.
-- **Core behavior:**
-  - Creates an `audit-fixes/[date]` branch.
-  - Spawns one fresh Task worker per batch.
-  - Commits changes and runs the full Playwright suite after each batch.
-  - On test failure with auto-fix enabled: spawns one auto-fix worker, re-runs tests, reverts the batch if still failing, and continues to the next batch.
-- **Flags:**
-  - `--dry-run` -- shows the execution plan (batches, models, failure policy, branch name) without launching workers.
-  - `--debug` -- writes resolved worker prompts and execution traces to `.cursor/debug-logs/`.
-- **Output:** Batch-by-batch status and final run summary with applied/skipped batches and git commands for review.
-- **Model guidance:** Sonnet generally; Opus for PE-level architectural fixes.
-
-#### `/fix-rollback`
-
-Safely recovers from regressions after fix execution.
-
-- **Usage patterns:**
-  - `/fix-rollback` -- shows options and current fix commits.
-  - `/fix-rollback all` -- abandon the entire fix branch.
-  - `/fix-rollback last` -- revert the most recent fix commit.
-  - `/fix-rollback SEC-H1` -- revert the commit for a specific finding.
-  - `/fix-rollback convex/email.ts` -- restore a specific file from main.
-- **Rollback options:** Single commit revert, revert last N, destructive reset (local-only), abandon branch, or restore one file.
-- **Behavior:** Defaults to the least destructive option and confirms state after rollback.
-
----
-
-### Step 4 -- Debugging
+### Step 3 -- Debugging
 
 #### `/debug-tests`
 
@@ -242,6 +181,6 @@ Runs a retry loop that fixes failing Playwright tests using fresh Task workers w
 ## `.cursor` folder reference
 
 - **`.cursor/mcp.json`** -- Configures MCP servers. This repo points to Playwright MCP via `npx @playwright/mcp@latest`.
-- **`.cursor/commands/`** -- Contains the 13 command definitions documented above.
+- **`.cursor/commands/`** -- Contains the 9 command definitions documented above.
 - **`.cursor/debug-session.json`** -- Created by `/debug-tests` to persist retry state across stops and resumes. Safe to delete for a fresh start.
-- **`.cursor/debug-logs/`** -- Created by `--debug` runs of `/fix-all` and `/debug-tests`. Contains resolved worker prompts and execution traces.
+- **`.cursor/debug-logs/`** -- Created by `--debug` runs of `/debug-tests`. Contains resolved worker prompts and execution traces.
